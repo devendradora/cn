@@ -129,6 +129,15 @@ int send_fd(int socket, int fd_to_send)
   return -1;
  }
  ----------------------------------------------------------------------------------------------------
+execve("objf2",arg,NULL);
+
+popen 
+ FILE *fp=popen("./temp.out","r");
+  char buf[60];
+  fscanf(fp,"%s",buf);
+  cout<<buf<<endl;
+--------------------------------------------------------------------------------------
+
 pipes
 
 server.c
@@ -614,7 +623,13 @@ int main(void)
 	}
 }
 
-
+or
+for(int i=0;i<strlen(buf);i++)
+ 			*(packet+sizeof(struct iphdr)+i)=buf[i];
+ 		ip->tot_len=htons(sizeof(struct iphdr)+strlen(buf));
+ 		if (sendto(rsfd1, (char *)packet,sizeof(struct iphdr)+strlen(buf), 0, 
+ 			(struct sockaddr *)&local, (socklen_t)sizeof(local)) < 0)
+ 			perror("packet send error:");
 
 
 ----------------------------------------------------------------------------------
@@ -643,7 +658,13 @@ int main(void)
 		recvfrom(sfd, (char *)&packet, sizeof(packet), 0,(struct sockaddr *)&saddr, &fromlen);
 		printf("%s\n",packet+sizeof(struct iphdr));
 	}
+
+
 }
+
+
+
+
 
 --------------------------------------------------------------------------------------------------------------------------------
 		         SOCKET PAIR	( usage -:  "./a.out")
@@ -1270,6 +1291,7 @@ return 0;
  	void do_thread_service(void *arg)
 	{
 		int *args= (int*)arg ;
+		//int x = *((int*)(arg));
  	
 	}
 	
@@ -1385,27 +1407,7 @@ int main (void)
     tcph->window = htons (5840); /* maximum allowed window size */
     tcph->check = 0; //leave checksum 0 now, filled later by pseudo header
     tcph->urg_ptr = 0;
-     
-    /*
-    //Now the TCP checksum
-    psh.source_address = inet_addr( source_ip );
-    psh.dest_address = sin.sin_addr.s_addr;
-    psh.placeholder = 0;
-    psh.protocol = IPPROTO_TCP;
-    psh.tcp_length = htons(sizeof(struct tcphdr) + strlen(data) );
-     
-    int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + strlen(data);
-    pseudogram = malloc(psize);
-     
-    memcpy(pseudogram , (char*) &psh , sizeof (struct pseudo_header));
-    memcpy(pseudogram + sizeof(struct pseudo_header) , tcph , sizeof(struct tcphdr) + strlen(data));
-     
-    tcph->check = csum( (unsigned short*) pseudogram , psize);
-     */
-     
-
-    //IP_HDRINCL to tell the kernel that headers are included in the packet
-    int one = 1;
+     int one = 1;
     const int *val = &one;
      
     if (setsockopt (s, IPPROTO_IP, IP_HDRINCL, val, sizeof (one)) < 0)
@@ -1433,6 +1435,317 @@ int main (void)
     return 0;
 }
 
+
+-----------------------------------------------------------------------------------
+
+ju
+
+
+
+
+using namespace std;
+
+int rsfd1,rsfd2;
+struct sockaddr_in local,foreign;
+int input[30] = {0};
+int input_count = 0;
+
+
+void* sender(void *ptr);
+void *receiver(void *ptr);
+
+
+
+int main()
+{
+	if((rsfd1=socket(AF_INET,SOCK_RAW,144))<0)
+	{
+		perror("rsfd1 error\n");
+	}
+ //cout<<rsfd1<<endl;
+	if((rsfd2=socket(AF_INET,SOCK_RAW,144))<0)
+	{
+		perror("rsfd2 error\n");
+	}
+	int optval=1;
+	const int *val=&optval;
+	if(setsockopt(rsfd1,IPPROTO_IP, IP_HDRINCL, val, sizeof(optval))<0)
+	{
+		perror("setsockopt error\n");
+		exit(0);
+	}
+
+
+   memset(&local,0,sizeof(struct sockaddr_in));
+   memset(&foreign,0,sizeof(struct sockaddr_in));
+   local.sin_family=AF_INET;
+   inet_pton(AF_INET, DEST, (struct in_addr *)&local.sin_addr.s_addr);
+   local.sin_port=htons(0);
+ 
+     pthread_t tid1,tid2;
+     pthread_create(&tid1,NULL,sender,NULL);
+     pthread_create(&tid2,NULL,receiver,NULL);
+     pthread_join(tid1,NULL);
+     return 0;
+ }
+
+client
+using namespace std;
+int rsfd1;
+struct sockaddr_in local,foreign;
+int flag=0;
+int row = 0;
+int nums[3][4],nums1[3][4];
+void* sender(void *ptr)
+{
+  char packet[50];char buf[30];
+	/* point the iphdr to the beginning of the packet */
+  struct iphdr *ip = (struct iphdr *)packet;  
+  
+  ip->version = 4;
+  ip->ihl = 5;	
+  ip->tos = 0;
+	ip->tot_len = htons(40);	/* 16 byte value */
+	ip->frag_off = 0;		/* no fragment */
+	ip->ttl = 64;			/* default value */
+	ip->protocol = 144;	/* protocol at L4 */
+	ip->check = 0;			/* not needed in iphdr */
+  ip->saddr =local.sin_addr.s_addr;
+  ip->daddr = local.sin_addr.s_addr;
+
+  while(1) 
+  {
+   sleep(1);
+   if(flag)
+   {
+    flag=0;
+    memset(buf,0,30);
+    strcpy(buf,"c1...won");
+    char tpbuf[3];
+    memset(tpbuf,0,3);
+
+    snprintf(tpbuf,3,"%d",nums1[row][0]);
+    strcat(buf,tpbuf);
+    strcat(buf,"-");
+    for(int i=1;i<4;i++)
+    {
+     memset(tpbuf,0,3);
+     snprintf(tpbuf,3,"%d",nums1[row][i]);
+     strcat(buf,tpbuf);
+     strcat(buf,"-");
+   }
+   for(int i=0;i<strlen(buf);i++)
+    *(packet+sizeof(struct iphdr)+i)=buf[i];
+  ip->tot_len=htons(sizeof(struct iphdr)+strlen(buf));
+  if (sendto(rsfd1, (char *)packet,sizeof(struct iphdr)+strlen(buf), 0, 
+   (struct sockaddr *)&local, (socklen_t)sizeof(local)) < 0)
+   perror("packet send error:");
+}
+}
+}
+
+void *receiver(void *ptr)
+{
+  int x = *((int*)(ptr));
+  int rsfd2;
+  if((rsfd2=socket(AF_INET,SOCK_RAW,145))<0)
+  {
+   perror("rsfd2 error\n");
+   }
+ sleep(1);
+ char message[20];
+ char packet[200];
+ struct iphdr *ip;
+  //ip=new iphdr();
+ socklen_t len=sizeof(struct sockaddr_in);
+ while(1)
+ {
+
+  int n=recvfrom(rsfd2,(char*)&packet,sizeof(packet),0,(struct sockaddr *)&foreign,(socklen_t *)&len);
+  if(n>0)
+  {
+   ip=(struct iphdr*)packet;
+      /* cout<<ip->id<<endl;
+       //cout<<ip->ihl<<endl;
+       cout<<ntohs(ip->tot_len)<<endl;
+       cout<<n<<endl;
+       cout<<sizeof(struct iphdr)<<endl;*/
+       /*for(int i=sizeof(struct iphdr);i<n;i++)
+       message[i-sizeof(struct iphdr)]=packet[i];
+       message[n-sizeof(struct iphdr)]='\0';*/
+       char c[10] = {'\0'};
+       int k1=0;
+      int k = sizeof(struct iphdr);  /* print the payload */
+       while (k < sizeof(packet)) 
+       {
+        c[k1++] = packet[k];
+        k++;
+      }
+      int rnum = atoi(c);
+       // if(c=='1' || c=='2' ||c=='3')
+       // flag=1;
+      for(int i=0;i<4;i++)
+        if(nums[x][i] == rnum)
+        {
+          nums[x][i] = 0;
+          break;
+        }
+        int j=0;
+        for(int pl = 0;pl<4;pl++)
+          cout<<nums[x][pl]<<" ";
+        cout<<endl;
+        for(j=0;j<4;j++)
+          if(nums[x][j] != 0)
+          {
+            break;
+          }
+          if(j>3)
+          {
+            row = x;
+            flag = 1;
+          }
+      // cout<<endl;
+        }
+      }
+    }
+
+    int main()
+    {
+      int timep = 1;
+      for(int i=0;i<3;i++)
+      {
+        for(int j=0;j<4;j++)
+        {
+          nums1[i][j]= timep;
+          nums[i][j] = timep++;
+        }
+      }
+
+      if((rsfd1=socket(AF_INET,SOCK_RAW,145))<0)
+      {
+       perror("rsfd1 error\n");
+     }
+ //cout<<rsfd1<<endl;
+     int optval=1;
+     const int *val=&optval;
+     if(setsockopt(rsfd1,IPPROTO_IP, IP_HDRINCL, val, sizeof(optval))<0)
+     {
+       perror("setsockopt error\n");
+       exit(0);
+     }
+ /*if(setsockopt(rsfd2,IPPROTO_IP, IP_HDRINCL, val, sizeof(optval))<0)
+ {
+   printf("setsockopt error\n");
+   exit(0);
+ }*/
+
+   memset(&local,0,sizeof(struct sockaddr_in));
+   memset(&foreign,0,sizeof(struct sockaddr_in));
+   local.sin_family=AF_INET;
+   inet_pton(AF_INET, DEST, (struct in_addr *)&local.sin_addr.s_addr);
+   local.sin_port=htons(0);
+ 
+ }
+     pthread_t tid1,tid2;
+     pthread_create(&tid1,NULL,sender,NULL);
+     int p1 = 0, p2 = 1, p3 = 2;
+     pthread_create(&tid2,NULL,receiver,(void*)(&p1));
+     pthread_create(&tid2,NULL,receiver,(void*)(&p2));
+     pthread_create(&tid2,NULL,receiver,(void*)(&p3));
+     pthread_join(tid1,NULL);
+     return 0;
+   }
+
+
+ void* sender(void *ptr)
+ {
+ 	char packet[50];char buf[30];
+
+ 	struct iphdr *ip = (struct iphdr *)packet;  
+ 	ip->version = 4;
+ 	ip->ihl = 5;
+ 	ip->tos = 0;
+	ip->tot_len = htons(40);	/* 16 byte value */
+
+    /*ip->idenification number is autogenerated */
+	ip->frag_off = 0;		/* no fragment */
+
+	ip->ttl = 64;			/* default value */
+	ip->protocol = 145;	/* protocol at L4 */
+	ip->check = 0;			/* not needed in iphdr */
+
+ 	ip->saddr =local.sin_addr.s_addr;
+ 	ip->daddr = local.sin_addr.s_addr;
+
+ 	while(1) {
+ 		sleep(1);
+ 		memset(buf,0,30);
+ 		cout<<"enter the number 1 to 30:\n";
+ 		scanf("%s",buf);
+ 		input[input_count++] = atoi(buf);
+
+                //strcpy(packet+sizeof(struct iphdr),buf);
+ 		for(int i=0;i<strlen(buf);i++)
+ 			*(packet+sizeof(struct iphdr)+i)=buf[i];
+ 		ip->tot_len=htons(sizeof(struct iphdr)+strlen(buf));
+ 		if (sendto(rsfd1, (char *)packet,sizeof(struct iphdr)+strlen(buf), 0, 
+ 			(struct sockaddr *)&local, (socklen_t)sizeof(local)) < 0)
+ 			perror("packet send error:");
+ 	}
+ }
+
+ void *receiver(void *ptr)
+ {
+ 	sleep(1); 
+ 	char packet[200];
+ 	struct iphdr *ip;
+ 	socklen_t len=sizeof(struct sockaddr_in);
+ 	int check[4], check_count=0;
+ 	while(1)
+ 	{
+
+ 		int n=recvfrom(rsfd2,(char*)&packet,sizeof(packet),0,(struct sockaddr *)&foreign,(socklen_t *)&len);
+ 		if(n>0)
+ 		{
+ 			ip=(struct iphdr*)packet;
+ 			
+ 			char tpbuf[3] = {'\0'};
+ 			int k = 0;
+ 			for(int i=sizeof(struct iphdr)+8;i<n;i++)
+ 			{
+ 				if(packet[i] == '-')
+ 				{
+ 					check[check_count++] = atoi(tpbuf);
+ 					memset(tpbuf,0,3);
+ 					k=0;
+ 				}
+ 				else
+ 					tpbuf[k++] = packet[i];
+ 			}
+ 			int flag = 0;
+ 			for(int j=0;j<check_count;j++)
+ 			{
+ 				int lop  = 0;
+ 				for(int lop=0;lop<input_count;lop++)
+ 				{
+ 					if(check[j] == input[lop])
+ 						break;
+ 				}
+ 				if(lop>=input_count)
+ 					flag = 1;
+ 			}
+ 			if(flag == 0)
+ 			{
+ 				for(int i=sizeof(struct iphdr);i<n;i++)
+ 					cout<<packet[i];
+ 			}
+ 			cout<<endl;
+ 		}
+ 	}
+ }
+
+
+----------------------------------------------------------------------------------
 
 Device driver
 
