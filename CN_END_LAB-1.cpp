@@ -131,6 +131,10 @@ int send_fd(int socket, int fd_to_send)
  ----------------------------------------------------------------------------------------------------
 execve("objf2",arg,NULL);
 
+int true = 1;
+	if(setsockopt(sfd,SOL_SOCKET,SO_REUSEADDR,&true,sizeof(int))<0)
+		derror("Reuse error");
+
 popen 
  FILE *fp=popen("./temp.out","r");
   char buf[60];
@@ -1046,15 +1050,7 @@ void process_sighandler(int sig){
 
 
 
-shared memory client  #include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/shm.h>
-#include <signal.h>
-#include <string.h>
+shared memory client  
 
 #define MAX_BUF 20
 
